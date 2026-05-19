@@ -10,37 +10,51 @@ To develop a Recurrent Neural Network (RNN) model for predicting stock prices us
 ## DESIGN STEPS
 ### STEP 1: 
 
-Write your own steps
+Load and normalize data, create sequences.
+
+
 
 ### STEP 2: 
+
+Convert data to tensors and set up DataLoader.
 
 
 
 ### STEP 3: 
 
+Define the RNN model architecture.
+
 
 
 ### STEP 4: 
 
+Summarize, compile with loss and optimizer.
+
 
 
 ### STEP 5: 
+
+Train the model with loss tracking.
 
 
 
 ### STEP 6: 
 
 
+Predict on test data, plot actual vs. predicted prices.
+
 
 
 
 ## PROGRAM
 
-### Name:
 
-### Register Number:
 
 ```python
+
+from google.colab import drive
+drive.mount('/content/drive')
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -51,13 +65,8 @@ from torch.utils.data import DataLoader, TensorDataset
 
 ## Step 1: Load and Preprocess Data
 # Load training and test datasets
-df_train = pd.read_csv('/content/trainset.csv')
-df_test = pd.read_csv('/content/testset.csv')
-
-df_train.head()
-
-from google.colab import drive
-drive.mount('/content/drive')
+df_train = pd.read_csv('/content/drive/MyDrive/trainset.csv')
+df_test = pd.read_csv('/content/drive/MyDrive/testset.csv')
 
 # Use closing prices
 train_prices = df_train['Close'].values.reshape(-1, 1)
@@ -81,6 +90,7 @@ seq_length = 60
 x_train, y_train = create_sequences(scaled_train, seq_length)
 x_test, y_test = create_sequences(scaled_test, seq_length)
 
+
 x_train.shape, y_train.shape, x_test.shape, y_test.shape
 
 # Convert to PyTorch tensors
@@ -89,24 +99,20 @@ y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
 x_test_tensor = torch.tensor(x_test, dtype=torch.float32)
 y_test_tensor = torch.tensor(y_test, dtype=torch.float32)
 
+
 # Create dataset and dataloader
 train_dataset = TensorDataset(x_train_tensor, y_train_tensor)
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 
 ## Step 2: Define RNN Model
 class RNNModel(nn.Module):
-    def __init__(self, input_size=1, hidden_size=64, num_layers=2, output_size=1):
+    def __init__(self, input_size=1,hidden_size=64,num_layers=2,output_size=1):
         super(RNNModel, self).__init__()
-        self.rnn = nn.RNN(
-            input_size,
-            hidden_size,
-            num_layers,
-            batch_first=True
-        )
-        self.fc = nn.Linear(hidden_size, output_size)
+        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc  = nn.Linear(hidden_size,output_size)
     def forward(self, x):
-        out, _ = self.rnn(x)
-        out = self.fc(out[:, -1, :])
+        out,_=self.rnn(x)
+        out=self.fc(out[:,-1,:])
         return out
 
 model = RNNModel()
@@ -123,6 +129,81 @@ summary(model, input_size=(64, 60, 1))
 criterion = nn.MSELoss()
 optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
 
+
+## Step 3: Train the Model
+
+
+def train_model(model, train_loader, criterion, optimizer, epochs=20):
+    train_losses = []
+    model.train()
+    for epoch in range(epochs):
+        total_loss = 0
+        for x_batch, y_batch in train_loader:
+            x_batch, y_batch =x_batch.to(device),y_batch.to(device)
+            optimizer.zero_grad()
+            outputs = model(x_batch)
+            loss = criterion(outputs, y_batch)
+            loss.backward()
+            optimizer.step()
+            total_loss += loss.item()
+        train_losses.append(total_loss / len(train_loader))
+        print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss / len(train_loader):.4f}")
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.preprocessing import MinMaxScaler
+import pandas as pd
+
+# --- Re-defining dependencies to make this cell self-contained --- 
+
+# Assuming df_train is already loaded from drive
+df_train = pd.read_csv('/content/drive/MyDrive/trainset.csv')
+train_prices = df_train['Close'].values.reshape(-1, 1)
+
+scaler = MinMaxScaler()
+scaled_train = scaler.fit_transform(train_prices)
+
+def create_sequences(data, seq_length):
+    x = []
+    y = []
+    for i in range(len(data) - seq_length):
+        x.append(data[i:i+seq_length])
+        y.append(data[i+seq_length])
+    return np.array(x), np.array(y)
+
+seq_length = 60
+x_train, y_train = create_sequences(scaled_train, seq_length)
+
+x_train_tensor = torch.tensor(x_train, dtype=torch.float32)
+y_train_tensor = torch.tensor(y_train, dtype=torch.float32)
+
+train_dataset = TensorDataset(x_train_tensor, y_train_tensor)
+train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
+
+class RNNModel(nn.Module):
+    def __init__(self, input_size=1,hidden_size=64,num_layers=2,output_size=1):
+        super(RNNModel, self).__init__()
+        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc  = nn.Linear(hidden_size,output_size)
+    def forward(self, x):
+        out,_=self.rnn(x)
+        out=self.fc(out[:,-1,:])
+        return out
+
+model = RNNModel()
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+model = model.to(device)
+
+criterion = nn.MSELoss()
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+# --- End of re-defining dependencies --- 
+
+# Re-define train_model locally to return train_losses
 def train_model(model, train_loader, criterion, optimizer, epochs=20):
     train_losses = []
     model.train()
@@ -137,14 +218,15 @@ def train_model(model, train_loader, criterion, optimizer, epochs=20):
             optimizer.step()
             total_loss += loss.item()
         train_losses.append(total_loss / len(train_loader))
-        print(f'Epoch [{epoch+1}/{epochs}], Loss: {total_loss / len(train_loader):.4f}')
-
+        print(f"Epoch [{epoch+1}/{epochs}], Loss: {total_loss / len(train_loader):.4f}")
     return train_losses
 
+# Call the (redefined) train_model function to get the losses
+train_losses = train_model(model, train_loader, criterion, optimizer, epochs=20)
 
-train_losses = train_model(model, train_loader, criterion, optimizer)
-print('Name: Yogesh V')
-print('Register Number: 212223230250')
+# Plot training loss
+print('Name: YOGESH V')
+print('Register Number:212223230250')
 plt.plot(train_losses, label='Training Loss')
 plt.xlabel('Epoch')
 plt.ylabel('MSE Loss')
@@ -163,8 +245,8 @@ predicted_prices = scaler.inverse_transform(predicted)
 actual_prices = scaler.inverse_transform(actual)
 
 # Plot the predictions vs actual prices
-print('Name: Yogesh V')
-print('Register Number: 212223230250')
+print('Name: YOGESH V')
+print('Register Number:212223230250)
 plt.figure(figsize=(10, 6))
 plt.plot(actual_prices, label='Actual Price')
 plt.plot(predicted_prices, label='Predicted Price')
@@ -175,20 +257,26 @@ plt.legend()
 plt.show()
 print(f'Predicted Price: {predicted_prices[-1]}')
 print(f'Actual Price: {actual_prices[-1]}')
+
+
 ```
 
 ### OUTPUT
 
 ## Training Loss Over Epochs Plot
+<img width="521" height="627" alt="WhatsApp Image 2026-05-19 at 1 20 39 PM" src="https://github.com/user-attachments/assets/09121e48-ed42-4416-a927-83f2d9f1825c" />
 
-Include your plot here
+
+
+
 
 ## True Stock Price, Predicted Stock Price vs time
+<img width="755" height="482" alt="WhatsApp Image 2026-05-19 at 1 21 55 PM" src="https://github.com/user-attachments/assets/808bf5d4-440a-40ee-bd1a-77d048f8b39d" />
 
-Include your plot here
 
 ### Predictions
-Include the predictions on test data
+<img width="201" height="38" alt="WhatsApp Image 2026-05-19 at 1 22 23 PM" src="https://github.com/user-attachments/assets/6ca6d3a5-c15b-4a48-ac8b-047248bfff0a" />
+
 
 ## RESULT
-Include your result here
+Thus, a Recurrent Neural Network (RNN) model for predicting stock prices using historical closing price data has been developed successfully.
